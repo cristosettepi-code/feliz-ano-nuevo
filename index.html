@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Feliz Año Nuevo, María</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      overflow: hidden;
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+    .wrap {
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      padding: 18px;
+    }
+
+    .card {
+      width: min(560px, calc(100% - 24px));
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      padding: 18px 18px 16px 18px;
+      color: #fff;
+      box-shadow: 0 10px 35px rgba(0,0,0,.35);
+      backdrop-filter: blur(6px);
+    }
+
+    .title {
+      margin: 0 0 8px 0;
+      font-size: 1.6rem;
+      letter-spacing: .2px;
+    }
+
+    .type {
+      margin: 0;
+      font-size: 1.05rem;
+      line-height: 1.45;
+      opacity: .95;
+      white-space: pre-line;
+      min-height: 9.5em;
+    }
+
+    .hint {
+      margin-top: 10px;
+      font-size: .92rem;
+      opacity: .8;
+    }
+
+    .status {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 7;
+      color: rgba(255,255,255,.95);
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.14);
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: .9rem;
+      max-width: calc(100% - 24px);
+      pointer-events: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="wrap">
+    <div class="card">
+      <h1 class="title">🎆 Feliz Año Nuevo, María ✨</h1>
+      <p id="msg" class="type"></p>
+      <div class="hint">Tip: toca la pantalla para hacer explotar más lucecitas ✨</div>
+    </div>
+  </div>
+
+  <div id="status" class="status">Cargando capri.png...</div>
+
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const FULL_MESSAGE =
+`
+
+ Te escriblo en este pequeño desarrollo web que realice para desearte un Feliz Año.
+
+“Ojalá este año te regale momentos tranquilos, sonrisas sinceras y muchos logros.
+
+Que lo empieces con buena actitud`
+
+    const msgEl = document.getElementById("msg");
+    let i = 0;
+    function typeNext() {
+      msgEl.textContent = FULL_MESSAGE.slice(0, i++);
+      if (i <= FULL_MESSAGE.length) requestAnimationFrame(typeNext);
+    }
+    typeNext();
+
+    const PRODUCT_URL = "./capri.png";
+    const statusEl = document.getElementById("status");
+
+    const capriImg = new Image();
+    capriImg.onload = () => {
+      statusEl.textContent = ` capri.png cargó (${capriImg.naturalWidth}×${capriImg.naturalHeight})`;
+    };
+    capriImg.onerror = () => {
+      const isFile = location.protocol === "file:";
+      statusEl.textContent = isFile
+        ? "⚠️ No cargó capri.png (file:// a veces bloquea). Mejor abre con servidor o súbelo a GitHub Pages."
+        : "⚠️ No cargó capri.png. Revisa nombre exacto y que esté junto al HTML.";
+    };
+    capriImg.src = PRODUCT_URL;
+
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    function resize() {
+      canvas.width = innerWidth * devicePixelRatio;
+      canvas.height = innerHeight * devicePixelRatio;
+      ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    }
+    resize();
+    addEventListener("resize", resize);
+
+    const rand = (a,b) => Math.random() * (b - a) + a;
+
+    const particles = [];
+    function spawnExplosion(x,y, baseHue){
+      const n = 220;
+      for(let k=0;k<n;k++){
+        particles.push({
+          x, y,
+          vx: rand(-6.2, 6.2),
+          vy: rand(-7.8, 3.2),
+          g: 0.12,
+          life: rand(55, 95),
+          size: rand(2, 4),
+          hue: (baseHue ?? rand(0, 360)),
+          a: 1
+        });
+      }
+    }
+
+    const fireworks = [];
+    class Firework {
+      constructor(){
+        this.x = rand(0, innerWidth);
+        this.y = innerHeight + 20;
+        this.ty = rand(innerHeight * 0.25, innerHeight * 0.55);
+        this.hue = rand(0, 360);
+        this.exploded = false;
+        this.bits = [];
+      }
+      explode(){
+        for(let k=0;k<75;k++){
+          this.bits.push({ x:this.x, y:this.y, vx:rand(-4.8,4.8), vy:rand(-4.8,4.8), life:75 });
+        }
+      }
+      update(){
+        if(!this.exploded){
+          this.y -= 7.2;
+          if(this.y <= this.ty){ this.exploded = true; this.explode(); }
+        } else {
+          for(const b of this.bits){ b.x += b.vx; b.y += b.vy; b.vy += 0.03; b.life--; }
+        }
+      }
+      draw(){
+        if(!this.exploded){
+          ctx.fillStyle = `hsl(${this.hue},100%,60%)`;
+          ctx.fillRect(this.x, this.y, 2, 12);
+        } else {
+          ctx.fillStyle = `hsl(${this.hue},100%,60%)`;
+          for(const b of this.bits) ctx.fillRect(b.x, b.y, 2, 2);
+        }
+      }
+      done(){ return this.exploded && this.bits.every(b => b.life <= 0); }
+    }
+
+    const capriRockets = [];
+    class CapriRocket{
+      constructor(){
+        this.x = rand(80, innerWidth - 80);
+        this.y = innerHeight + 160;
+        this.ty = rand(innerHeight * 0.25, innerHeight * 0.55);
+        this.vy = rand(6.6, 8.8);
+        this.angle = rand(-0.18, 0.18);
+        this.scale = rand(0.16, 0.24);
+        this.hue = rand(0, 360);
+        this.exploded = false;
+      }
+      update(){
+        if(this.exploded) return;
+        this.y -= this.vy;
+        this.x += Math.sin(this.y / 38) * 0.6;
+        if(this.y <= this.ty){
+          this.exploded = true;
+          spawnExplosion(this.x, this.y, this.hue);
+          spawnExplosion(this.x, this.y, this.hue);
+        }
+      }
+      drawTrail(){
+        ctx.fillStyle = `hsla(${this.hue},100%,60%,0.95)`;
+        ctx.fillRect(this.x, this.y + 38, 2, 22);
+      }
+      drawWithImage(){
+        const ok = capriImg.complete && capriImg.naturalWidth && capriImg.naturalHeight;
+        if(!ok) return false;
+
+        const w = capriImg.naturalWidth * this.scale;
+        const h = capriImg.naturalHeight * this.scale;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        ctx.drawImage(capriImg, -w/2, -h/2, w, h);
+        ctx.restore();
+        return true;
+      }
+      drawFallback(){
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+
+        const w = 56, h = 86;
+        ctx.fillStyle = "rgba(255,255,255,0.95)";
+        ctx.strokeStyle = "rgba(255,255,255,0.25)";
+        ctx.lineWidth = 2;
+        roundRect(-w/2, -h/2, w, h, 14, true, true);
+
+        ctx.fillStyle = `hsla(${this.hue},100%,60%,0.9)`;
+        roundRect(-w/2+6, -h/2+10, w-12, 16, 8, true, false);
+
+        ctx.fillStyle = "#111";
+        ctx.font = "bold 10px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("CAPRI", 0, 6);
+        ctx.fillText("SUN", 0, 20);
+
+        ctx.restore();
+
+        function roundRect(x, y, w, h, r, fill, stroke){
+          const min = Math.min(w,h);
+          if(r > min/2) r = min/2;
+          ctx.beginPath();
+          ctx.moveTo(x+r, y);
+          ctx.arcTo(x+w, y, x+w, y+h, r);
+          ctx.arcTo(x+w, y+h, x, y+h, r);
+          ctx.arcTo(x, y+h, x, y, r);
+          ctx.arcTo(x, y, x+w, y, r);
+          ctx.closePath();
+          if(fill) ctx.fill();
+          if(stroke) ctx.stroke();
+        }
+      }
+      draw(){
+        if(this.exploded) return;
+        this.drawTrail();
+        const drawn = this.drawWithImage();
+        if(!drawn) this.drawFallback();
+      }
+      done(){ return this.exploded; }
+    }
+
+    function roundRect(x, y, w, h, r, fill, stroke){
+      const min = Math.min(w,h);
+      if(r > min/2) r = min/2;
+      ctx.beginPath();
+      ctx.moveTo(x+r, y);
+      ctx.arcTo(x+w, y, x+w, y+h, r);
+      ctx.arcTo(x+w, y+h, x, y+h, r);
+      ctx.arcTo(x, y+h, x, y, r);
+      ctx.arcTo(x, y, x+w, y, r);
+      ctx.closePath();
+      if(fill) ctx.fill();
+      if(stroke) ctx.stroke();
+    }
+
+    function loop(){
+      ctx.fillStyle = "rgba(0,0,0,0.22)";
+      ctx.fillRect(0,0,innerWidth,innerHeight);
+
+      if(Math.random() < 0.05) fireworks.push(new Firework());
+      if(Math.random() < 0.02) capriRockets.push(new CapriRocket());
+
+      for(let k=fireworks.length-1;k>=0;k--){
+        fireworks[k].update();
+        fireworks[k].draw();
+        if(fireworks[k].done()) fireworks.splice(k,1);
+      }
+
+      for(let k=capriRockets.length-1;k>=0;k--){
+        capriRockets[k].update();
+        capriRockets[k].draw();
+        if(capriRockets[k].done()) capriRockets.splice(k,1);
+      }
+
+      for(let k=particles.length-1;k>=0;k--){
+        const p = particles[k];
+        p.x += p.vx; p.y += p.vy; p.vy += p.g;
+        p.life--; p.a = Math.max(p.life/95, 0);
+        ctx.fillStyle = `hsla(${p.hue},100%,60%,${p.a})`;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+        if(p.life <= 0) particles.splice(k,1);
+      }
+
+      requestAnimationFrame(loop);
+    }
+    loop();
+
+    addEventListener("pointerdown", (e) => {
+      spawnExplosion(e.clientX, e.clientY);
+    });
+  </script>
+</body>
+</html>
